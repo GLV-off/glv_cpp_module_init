@@ -14,6 +14,9 @@ mkdir_win(const char* dir);
 static std::string 
 current_dir(const int argc, char** argv);
 
+static bool
+file_exist(const char* path);
+
 static void 
 create_build_script(const char* path);
 
@@ -70,30 +73,35 @@ mkdir_win(const char* dir) {
   }
 }
 
+static bool
+file_exist(const char* path) 
+{
+  DWORD dwAttrib = ::GetFileAttributesA(path);
+
+  return (dwAttrib != INVALID_FILE_ATTRIBUTES && 
+         !(dwAttrib & FILE_ATTRIBUTE_DIRECTORY));
+}
+
 static void 
 create_build_script(const char* path) {
+  if (file_exist(path)) {
+    std::cout << "build script already exist's. Overwrite not implemented or not configured." << std::endl;
+    return;
+  }
+
   std::ofstream stream(path);
+  /* todo: glv: #4 08122025 - Записать UTF-8-BOM заголовок*/
   stream << "@echo off" << std::endl
     << std::endl
     << "@set OUT_NAME=app.exe" << std::endl
     << "@set OUT_D=..\\..\\out" << std::endl
     << "@set CC=g++" << std::endl
-    << "@set CF=-std=c++2a -g -c";
+    << "@set CF=-std=c++2a -g -c" << std::endl
+    << "@set CL=-std=c++2a -g" << std::endl
+    << "@set SRC_D=..\\..\\src" << std::endl
+    << std::endl
+    << "if not exist %OUT_D% (mkdir %OUT_D%)" << std::endl;
 
-// @set OUT_NAME=glv_cmi.exe
-// @set OUT_D=..\..\out
-// @set CC=g++
-// @set CF=-std=c++2a -g -c
-// @set CL=-std=c++2a -g
-// @set SRC_D=..\..\src
-
-// if not exist %OUT_D% (mkdir %OUT_D%)
-
-// %CC% %CF% %SRC_D%\main.cpp -o %OUT_D%\main.o || exit /b
-// %CC% %CL% %OUT_D%\main.o -o %OUT_D%\%OUT_NAME% || exit /b 
-
-
-
-
+    /* todo: glv: #3 08122025 Конфигурировать отладочный режим*/
   stream.close();
 }
