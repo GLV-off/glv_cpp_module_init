@@ -9,6 +9,6 @@
 
 if not exist %OUT_D% (mkdir %OUT_D%)
 
-%CC% %CF% %SRC_D%\main.cpp -o %OUT_D%\main.o || exit /b
+%CC% %CF% %SRC_D%\main.cpp -o %OUT_D%\main.o || exit /b 
 %CC% %CL% %OUT_D%\main.o -o %OUT_D%\%OUT_NAME% || exit /b 
 

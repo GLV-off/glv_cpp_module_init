@@ -20,7 +20,14 @@ file_exist(const char* path);
 static void 
 create_build_script(const char* path);
 
+static bool
+is_read_only_dir(const char* path);
+
 int main(int argc, char** argv) {
+  /* todo: glv: 08122025
+    #5  Сделать проверку на доступность папки в которой 
+    мы запустились на запись. Попробовать получить и изменить 
+    доступ к чтению\записи у папки\файла */
   std::cout << argv[0] << std::endl;
 
   std::string root_path = current_dir(argc, argv);
@@ -37,7 +44,9 @@ int main(int argc, char** argv) {
     библиотеки или  
     #2 Если файл уже существует то не слепо 
     заменять его */
-  create_build_script((sub_path + "\\build.bat").c_str());
+  std::string s_script = sub_path + "\\build.bat";
+  create_build_script(s_script.c_str());
+  
   paths.push_back(sub_path);
   sub_path = root_path + "\\src";
   paths.push_back(sub_path);
@@ -85,23 +94,66 @@ file_exist(const char* path)
 static void 
 create_build_script(const char* path) {
   if (file_exist(path)) {
-    std::cout << "build script already exist's. Overwrite not implemented or not configured." << std::endl;
+    std::cerr << "build script already exist's. Overwrite not implemented or not configured." << std::endl;
+    return;
+  }
+  
+  if (is_read_only_dir(path)) {
+    std::cerr << "cant write to dir - read only" << std::endl;
     return;
   }
 
-  std::ofstream stream(path);
-  /* todo: glv: #4 08122025 - Записать UTF-8-BOM заголовок*/
-  stream << "@echo off" << std::endl
-    << std::endl
-    << "@set OUT_NAME=app.exe" << std::endl
-    << "@set OUT_D=..\\..\\out" << std::endl
-    << "@set CC=g++" << std::endl
-    << "@set CF=-std=c++2a -g -c" << std::endl
-    << "@set CL=-std=c++2a -g" << std::endl
-    << "@set SRC_D=..\\..\\src" << std::endl
-    << std::endl
-    << "if not exist %OUT_D% (mkdir %OUT_D%)" << std::endl;
+  std::ofstream stream;
+  
+  stream.open(path, std::ios_base::out);
+
+  if (stream.is_open()) { 
+    /* todo: glv: #4 08122025 - Записать UTF-8-BOM заголовок */
+    stream << "@echo off" << std::endl
+      << std::endl
+      << "@set OUT_NAME=app.exe" << std::endl
+      << "@set OUT_D=..\\..\\out" << std::endl
+      << "@set CC=g++" << std::endl
+      << "@set CF=-std=c++2a -g -c" << std::endl
+      << "@set CL=-std=c++2a -g" << std::endl
+      << "@set SRC_D=..\\..\\src" << std::endl
+      << std::endl
+      << "if not exist %OUT_D% (mkdir %OUT_D%)" << std::endl;
 
     /* todo: glv: #3 08122025 Конфигурировать отладочный режим*/
-  stream.close();
+    stream.flush();
+    stream.close();
+  } else {
+    std::cerr << "file not created!: " << path << std::endl;
+  }
+}
+
+static bool
+is_read_only_dir(const char* path) 
+{
+  DWORD attr = GetFileAttributesA(path); 
+  if (attr == INVALID_FILE_ATTRIBUTES) {
+      std::cerr << "Directory not exist" << std::endl;
+      return false;
+  }
+  
+  // Проверяем права через access control lists (ACL)
+  HANDLE hToken;
+  if (OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &hToken)) {
+      GENERIC_MAPPING mapping = { 0 };
+      PRIVILEGE_SET privileges = { 0 };
+      DWORD privilegesLength = sizeof(privileges);
+      DWORD grantedAccess;
+      BOOL result;
+      PSECURITY_DESCRIPTOR ACL;
+      // Проверяем право на запись
+      if (AccessCheck(ACL, hToken, FILE_WRITE_DATA, 
+                      &mapping, &privileges, &privilegesLength, 
+                      &grantedAccess, &result)) {
+          CloseHandle(hToken);
+          return result != FALSE;
+      }
+      CloseHandle(hToken);
+  }
+  return false;
 }
